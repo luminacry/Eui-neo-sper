@@ -1,0 +1,40 @@
+<Stack id="root">
+  <Rect id="hero.bg"
+        x="36" y="34" width="820" height="420"
+        radius="18"
+        color="#141A22" />
+
+  <Text id="hero.title"
+        x="68" y="66" width="560" height="48"
+        text="EUI XML Preview"
+        fontSize="34"
+        lineHeight="42"
+        fontWeight="820"
+        color="#F2F6FFFF" />
+
+  <Text id="hero.body"
+        x="70" y="128" width="520" height="76"
+        text="Edit this XML file and the preview window reloads automatically."
+        fontSize="18"
+        lineHeight="26"
+        wrap="true"
+        color="#AEB8CCFF" />
+
+  <Button id="hero.button"
+          x="70" y="230" width="154" height="48"
+          text="Preview"
+          fontSize="16"
+          radius="12" />
+
+  <Panel id="hero.panel"
+         x="610" y="74" width="190" height="260"
+         radius="16" />
+
+  <Text id="hero.panel.text"
+        x="636" y="108" width="138" height="132"
+        text="This is the XML layer that a drag-and-drop editor can write back later."
+        fontSize="15"
+        lineHeight="22"
+        wrap="true"
+        color="#D6DDEFFF" />
+</Stack>

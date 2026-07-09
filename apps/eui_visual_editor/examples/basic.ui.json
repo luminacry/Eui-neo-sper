@@ -1,0 +1,62 @@
+{
+  "type": "stack",
+  "id": "root",
+  "children": [
+    {
+      "type": "rect",
+      "id": "hero.bg",
+      "position": [36, 34],
+      "size": [820, 420],
+      "radius": 18,
+      "color": [0.08, 0.10, 0.13, 1]
+    },
+    {
+      "type": "text",
+      "id": "hero.title",
+      "position": [68, 66],
+      "size": [520, 48],
+      "text": "EUI",
+      "fontSize": 34,
+      "lineHeight": 42,
+      "fontWeight": 820,
+      "color": [0.95, 0.97, 1.0, 1]
+    },
+    {
+      "type": "text",
+      "id": "hero.body",
+      "position": [70, 128],
+      "size": [520, 76],
+      "text": "The first MVP renders stack, rect, text, image, button, card, panel and workshop::cardSlider.",
+      "fontSize": 18,
+      "lineHeight": 26,
+      "wrap": true,
+      "color": [0.68, 0.72, 0.80, 1]
+    },
+    {
+      "type": "button",
+      "id": "hero.button",
+      "position": [70, 230],
+      "size": [154, 48],
+      "text": "Preview",
+      "fontSize": 16
+    },
+    {
+      "type": "panel",
+      "id": "hero.panel",
+      "position": [610, 74],
+      "size": [190, 260],
+      "radius": 16
+    },
+    {
+      "type": "text",
+      "id": "hero.panel.text",
+      "position": [636, 108],
+      "size": [138, 120],
+      "text": "测试",
+      "fontSize": 15,
+      "lineHeight": 22,
+      "wrap": true,
+      "color": [0.84, 0.87, 0.94, 1]
+    }
+  ]
+}
