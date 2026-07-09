@@ -1,4 +1,4 @@
-# EUI-NEO 可视化编辑器实验
+# EUI-NEO 可视化编辑器Demo
 
 这是基于 EUI-NEO 做的可视化 UI 编辑器原型，目标是实现类似 Android Studio XML 设计器 / Compose Preview 的开发体验。
 
@@ -80,7 +80,7 @@ apps/eui_visual_editor/examples/basic.ui.xml
 
 ## 当前阶段
 
-这是第一版实验原型，已经跑通：
+已经经过测试：
 
 - 组件库
 - 画布
@@ -90,11 +90,14 @@ apps/eui_visual_editor/examples/basic.ui.xml
 - XML 保存
 - 实时预览
 
-后续可以继续加入：
+后续加入：
 
-- 真正从左侧拖拽组件到画布
+- 从左侧拖拽组件到画布
 - resize handles
 - 图层树
 - 对齐辅助线
 - 撤销 / 重做
 - 插件组件注册
+- 第三方组件库支持
+- 逻辑代码低代码化
+- 纯低代码开发逻辑封装
