@@ -5,6 +5,7 @@
 #include "eui_neo.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
@@ -51,6 +52,7 @@ std::string paletteDragType;
 std::string statusText = "Ready";
 int idCounter = 1;
 int documentRevision = 0;
+int leftPanelTab = 0;
 bool initialized = false;
 bool paletteDragging = false;
 float paletteDragX = 0.0f;
@@ -59,8 +61,14 @@ float canvasGlobalX = 0.0f;
 float canvasGlobalY = 0.0f;
 float canvasGlobalWidth = 0.0f;
 float canvasGlobalHeight = 0.0f;
+bool guideXVisible = false;
+bool guideYVisible = false;
+float guideX = 0.0f;
+float guideY = 0.0f;
 std::vector<HistoryEntry> undoStack;
 std::vector<HistoryEntry> redoStack;
+
+UiNode* findNode(UiNode& node, const std::string& id);
 
 const std::vector<PaletteItem> palette = {
     {"rect", "Rect"},
@@ -180,6 +188,54 @@ void redo() {
     root = std::move(entry.root);
     selectedId = std::move(entry.selectedId);
     markChanged("Redo");
+}
+
+void clearGuides() {
+    guideXVisible = false;
+    guideYVisible = false;
+}
+
+bool moveNodeInTree(UiNode& parent, const std::string& id, int direction) {
+    for (std::size_t i = 0; i < parent.children.size(); ++i) {
+        if (parent.children[i].id == id) {
+            const int target = static_cast<int>(i) + direction;
+            if (target < 0 || target >= static_cast<int>(parent.children.size())) {
+                return false;
+            }
+            std::swap(parent.children[i], parent.children[static_cast<std::size_t>(target)]);
+            return true;
+        }
+    }
+    for (UiNode& child : parent.children) {
+        if (moveNodeInTree(child, id, direction)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void moveSelectedLayer(int direction) {
+    if (selectedId.empty()) {
+        statusText = "Select a layer first";
+        return;
+    }
+    const std::vector<HistoryEntry> previousRedo = redoStack;
+    pushHistory();
+    if (moveNodeInTree(root, selectedId, direction)) {
+        markChanged(direction > 0 ? "Layer moved up" : "Layer moved down");
+    } else {
+        undoStack.pop_back();
+        redoStack = previousRedo;
+        statusText = direction > 0 ? "Already at top" : "Already at bottom";
+    }
+}
+
+void toggleLayerVisibility(const std::string& id) {
+    if (UiNode* node = findNode(root, id)) {
+        pushHistory();
+        node->booleans["visible"] = !visual_editor::boolOr(*node, "visible", true);
+        markChanged(node->booleans["visible"] ? "Layer shown" : "Layer hidden");
+    }
 }
 
 UiNode makeNode(const std::string& type, float x, float y) {
@@ -308,6 +364,90 @@ UiNode* selectedNode() {
     return selectedId.empty() ? nullptr : findNode(root, selectedId);
 }
 
+struct AxisSnap {
+    bool active = false;
+    double delta = 0.0;
+    double distance = 7.0;
+    float guide = 0.0f;
+};
+
+void considerSnap(AxisSnap& snap, double movingAnchor, double target) {
+    const double delta = target - movingAnchor;
+    const double distance = std::fabs(delta);
+    if (distance <= 6.0 && distance < snap.distance) {
+        snap.active = true;
+        snap.delta = delta;
+        snap.distance = distance;
+        snap.guide = static_cast<float>(target);
+    }
+}
+
+void snapNodeToGuides(UiNode& node) {
+    const double x = visual_editor::numberOr(node, "x", 0.0);
+    const double y = visual_editor::numberOr(node, "y", 0.0);
+    const double width = std::max(1.0, visual_editor::numberOr(node, "width", 120.0));
+    const double height = std::max(1.0, visual_editor::numberOr(node, "height", 48.0));
+    AxisSnap xSnap;
+    AxisSnap ySnap;
+    const double movingX[] = {x, x + width * 0.5, x + width};
+    const double movingY[] = {y, y + height * 0.5, y + height};
+    const double canvasX[] = {0.0, canvasGlobalWidth * 0.5, canvasGlobalWidth};
+    const double canvasY[] = {0.0, canvasGlobalHeight * 0.5, canvasGlobalHeight};
+    for (double moving : movingX) {
+        for (double target : canvasX) {
+            considerSnap(xSnap, moving, target);
+        }
+    }
+    for (double moving : movingY) {
+        for (double target : canvasY) {
+            considerSnap(ySnap, moving, target);
+        }
+    }
+
+    for (const UiNode& sibling : root.children) {
+        if (sibling.id == node.id || sibling.type == "cardSliderItem" ||
+            !visual_editor::boolOr(sibling, "visible", true)) {
+            continue;
+        }
+        const double sx = visual_editor::numberOr(sibling, "x", 0.0);
+        const double sy = visual_editor::numberOr(sibling, "y", 0.0);
+        const double sw = std::max(1.0, visual_editor::numberOr(sibling, "width", 120.0));
+        const double sh = std::max(1.0, visual_editor::numberOr(sibling, "height", 48.0));
+        const double targetX[] = {sx, sx + sw * 0.5, sx + sw};
+        const double targetY[] = {sy, sy + sh * 0.5, sy + sh};
+        for (double moving : movingX) {
+            for (double target : targetX) {
+                considerSnap(xSnap, moving, target);
+            }
+        }
+        for (double moving : movingY) {
+            for (double target : targetY) {
+                considerSnap(ySnap, moving, target);
+            }
+        }
+    }
+
+    clearGuides();
+    if (xSnap.active) {
+        node.numbers["x"] = x + xSnap.delta;
+        guideXVisible = true;
+        guideX = xSnap.guide;
+    }
+    if (ySnap.active) {
+        node.numbers["y"] = y + ySnap.delta;
+        guideYVisible = true;
+        guideY = ySnap.guide;
+    }
+    node.numbers["x"] = std::clamp(
+        visual_editor::numberOr(node, "x", 0.0),
+        0.0,
+        std::max(0.0, static_cast<double>(canvasGlobalWidth) - width));
+    node.numbers["y"] = std::clamp(
+        visual_editor::numberOr(node, "y", 0.0),
+        0.0,
+        std::max(0.0, static_cast<double>(canvasGlobalHeight) - height));
+}
+
 void reassignIds(UiNode& node) {
     node.id = nextId(node.type == "cardSliderItem" ? "item" : node.type);
     for (UiNode& child : node.children) {
@@ -336,12 +476,14 @@ void deleteSelected() {
         statusText = "Select a node to delete";
         return;
     }
+    const std::vector<HistoryEntry> previousRedo = redoStack;
     pushHistory();
     if (eraseNode(root, selectedId)) {
         selectedId.clear();
         markChanged("Node deleted");
     } else {
         undoStack.pop_back();
+        redoStack = previousRedo;
         statusText = "Node not found";
     }
 }
@@ -451,8 +593,10 @@ void saveXml() {
 
 void drawHeader(eui::Ui& ui, float width);
 void drawPalette(eui::Ui& ui, float height);
+void drawLayerRows(eui::Ui& ui, UiNode& parent, int depth, float& y, float maxY);
 void drawPaletteDragGhost(eui::Ui& ui);
 void drawCanvas(eui::Ui& ui, float x, float y, float width, float height);
+void drawAlignmentGuides(eui::Ui& ui, float width, float height);
 void drawInspector(eui::Ui& ui, float x, float height);
 void drawNodeOverlays(eui::Ui& ui, UiNode& node);
 void drawNumberEditor(eui::Ui& ui, const std::string& id, UiNode& node, const std::string& key, float x, float y);
@@ -558,15 +702,63 @@ void drawPalette(eui::Ui& ui, float height) {
         .color({0.055f, 0.061f, 0.074f, 1.0f})
         .border(1.0f, {1.0f, 1.0f, 1.0f, 0.07f})
         .build();
-    ui.text("palette.title")
-        .position(18.0f, kHeaderH + 18.0f)
-        .size(kLeftW - 36.0f, 24.0f)
-        .text("Components")
-        .fontSize(16.0f)
-        .lineHeight(22.0f)
-        .fontWeight(800)
-        .color(tokens.text)
-        .build();
+    const char* tabs[] = {"Components", "Layers"};
+    for (int i = 0; i < 2; ++i) {
+        const bool active = leftPanelTab == i;
+        ui.rect("left.tab." + std::to_string(i) + ".bg")
+            .position(12.0f + i * 106.0f, kHeaderH + 12.0f)
+            .size(100.0f, 34.0f)
+            .states(active ? tokens.primary : tokens.surface,
+                    active ? tokens.primary : tokens.surfaceHover,
+                    tokens.surfaceActive)
+            .radius(8.0f)
+            .onClick([i] { leftPanelTab = i; })
+            .build();
+        ui.text("left.tab." + std::to_string(i) + ".text")
+            .position(12.0f + i * 106.0f, kHeaderH + 20.0f)
+            .size(100.0f, 18.0f)
+            .text(tabs[i])
+            .fontSize(12.0f)
+            .lineHeight(16.0f)
+            .fontWeight(720)
+            .color(active ? eui::Color{0.04f, 0.06f, 0.08f, 1.0f} : tokens.text)
+            .horizontalAlign(eui::HorizontalAlign::Center)
+            .build();
+    }
+
+    if (leftPanelTab == 1) {
+        ui.stack("layers.down.wrap")
+            .position(14.0f, kHeaderH + 58.0f)
+            .size(96.0f, 34.0f)
+            .content([&] {
+                components::button(ui, "layers.down")
+                    .theme(tokens, false)
+                    .size(96.0f, 34.0f)
+                    .text("Move down")
+                    .fontSize(12.0f)
+                    .radius(8.0f)
+                    .onClick([] { moveSelectedLayer(-1); })
+                    .build();
+            })
+            .build();
+        ui.stack("layers.up.wrap")
+            .position(118.0f, kHeaderH + 58.0f)
+            .size(104.0f, 34.0f)
+            .content([&] {
+                components::button(ui, "layers.up")
+                    .theme(tokens, false)
+                    .size(104.0f, 34.0f)
+                    .text("Move up")
+                    .fontSize(12.0f)
+                    .radius(8.0f)
+                    .onClick([] { moveSelectedLayer(1); })
+                    .build();
+            })
+            .build();
+        float layerY = kHeaderH + 104.0f;
+        drawLayerRows(ui, root, 0, layerY, height - 12.0f);
+        return;
+    }
 
     float y = kHeaderH + 58.0f;
     for (const PaletteItem& item : palette) {
@@ -629,6 +821,72 @@ void drawPalette(eui::Ui& ui, float height) {
             })
             .build();
         y += 52.0f;
+    }
+}
+
+void drawLayerRows(eui::Ui& ui, UiNode& parent, int depth, float& y, float maxY) {
+    const auto tokens = theme();
+    for (auto it = parent.children.rbegin(); it != parent.children.rend() && y + 38.0f <= maxY; ++it) {
+        UiNode& node = *it;
+        if (node.type == "cardSliderItem") {
+            continue;
+        }
+        const bool selected = node.id == selectedId;
+        const bool visible = visual_editor::boolOr(node, "visible", true);
+        const float indent = std::min(32.0f, static_cast<float>(depth) * 14.0f);
+        ui.rect("layer." + node.id + ".bg")
+            .position(12.0f, y)
+            .size(kLeftW - 24.0f, 34.0f)
+            .states(selected ? components::theme::withAlpha(tokens.primary, 0.26f) : tokens.surface,
+                    selected ? components::theme::withAlpha(tokens.primary, 0.34f) : tokens.surfaceHover,
+                    tokens.surfaceActive)
+            .radius(7.0f)
+            .onClick([id = node.id] {
+                selectedId = id;
+                pendingType.clear();
+                statusText = "Layer selected";
+            })
+            .build();
+        ui.text("layer." + node.id + ".type")
+            .position(20.0f + indent, y + 8.0f)
+            .size(52.0f, 18.0f)
+            .text(typeTag(node.type))
+            .fontSize(11.0f)
+            .lineHeight(15.0f)
+            .fontWeight(760)
+            .color(selected ? tokens.primary : components::theme::withAlpha(tokens.text, 0.58f))
+            .build();
+        ui.text("layer." + node.id + ".name")
+            .position(74.0f + indent, y + 8.0f)
+            .size(std::max(20.0f, 106.0f - indent), 18.0f)
+            .text(node.id)
+            .fontSize(11.0f)
+            .lineHeight(15.0f)
+            .color(components::theme::withAlpha(tokens.text, visible ? 0.84f : 0.38f))
+            .build();
+        ui.rect("layer." + node.id + ".visible")
+            .position(kLeftW - 48.0f, y + 5.0f)
+            .size(26.0f, 24.0f)
+            .states(visible ? tokens.primary : tokens.surfaceActive,
+                    visible ? tokens.primary : tokens.surfaceHover,
+                    tokens.surfaceActive)
+            .radius(6.0f)
+            .zIndex(1200)
+            .onClick([id = node.id] { toggleLayerVisibility(id); })
+            .build();
+        ui.text("layer." + node.id + ".visible.text")
+            .position(kLeftW - 48.0f, y + 9.0f)
+            .size(26.0f, 16.0f)
+            .text(visible ? "V" : "-")
+            .fontSize(11.0f)
+            .lineHeight(14.0f)
+            .fontWeight(800)
+            .color(visible ? eui::Color{0.04f, 0.06f, 0.08f, 1.0f} : tokens.text)
+            .horizontalAlign(eui::HorizontalAlign::Center)
+            .zIndex(1201)
+            .build();
+        y += 40.0f;
+        drawLayerRows(ui, node, depth + 1, y, maxY);
     }
 }
 
@@ -701,12 +959,33 @@ void drawCanvas(eui::Ui& ui, float x, float y, float width, float height) {
             for (UiNode& child : root.children) {
                 drawNodeOverlays(ui, child);
             }
+            drawAlignmentGuides(ui, width, height);
         })
         .build();
 }
 
+void drawAlignmentGuides(eui::Ui& ui, float width, float height) {
+    const eui::Color guideColor{0.24f, 0.82f, 0.96f, 0.92f};
+    if (guideXVisible) {
+        ui.rect("canvas.guide.x")
+            .position(guideX - 0.5f, 0.0f)
+            .size(1.0f, height)
+            .color(guideColor)
+            .zIndex(1800)
+            .build();
+    }
+    if (guideYVisible) {
+        ui.rect("canvas.guide.y")
+            .position(0.0f, guideY - 0.5f)
+            .size(width, 1.0f)
+            .color(guideColor)
+            .zIndex(1800)
+            .build();
+    }
+}
+
 void drawNodeOverlays(eui::Ui& ui, UiNode& node) {
-    if (node.type == "cardSliderItem") {
+    if (node.type == "cardSliderItem" || !visual_editor::boolOr(node, "visible", true)) {
         return;
     }
     const float x = visual_editor::floatOr(node, "x", 0.0f);
@@ -740,14 +1019,20 @@ void drawNodeOverlays(eui::Ui& ui, UiNode& node) {
         .onDragStart([id = node.id](const components::MouseEvent&) {
             selectedId = id;
             pushHistory();
+            clearGuides();
         })
         .onDrag([id = node.id](const components::MouseDragEvent& event) {
             if (UiNode* node = findNode(root, id)) {
                 node->numbers["x"] = visual_editor::numberOr(*node, "x", 0.0) + event.deltaX;
                 node->numbers["y"] = visual_editor::numberOr(*node, "y", 0.0) + event.deltaY;
+                snapNodeToGuides(*node);
                 selectedId = id;
                 markChanged("Dragging node");
             }
+        })
+        .onDragEnd([](const components::MouseDragEvent&) {
+            clearGuides();
+            markChanged("Node moved");
         })
         .build();
 

@@ -120,7 +120,7 @@ private:
             return;
         }
         if (key == "wrap" || key == "autoPlay" || key == "background" ||
-            key == "backgroundEnabled" || key == "tilt" || key == "primary") {
+            key == "backgroundEnabled" || key == "tilt" || key == "primary" || key == "visible") {
             node.booleans[key == "backgroundEnabled" ? "background" : key] = parseBool(value);
             return;
         }

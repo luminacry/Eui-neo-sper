@@ -192,6 +192,9 @@ inline void renderUnknown(eui::Ui& ui, const UiNode& node, const std::string& id
 }
 
 inline void renderNode(eui::Ui& ui, const UiNode& node, float parentWidth, float parentHeight, const std::string& fallbackId) {
+    if (!boolOr(node, "visible", true)) {
+        return;
+    }
     const std::string id = nodeId(node, fallbackId);
     if (node.type == "stack") {
         renderStack(ui, node, parentWidth, parentHeight, id);

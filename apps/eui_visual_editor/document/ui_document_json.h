@@ -320,7 +320,7 @@ inline UiNode parseNode(const JsonValue& value, const std::string& fallbackId) {
         }
     }
 
-    const char* boolKeys[] = {"wrap", "autoPlay", "background", "tilt", "primary"};
+    const char* boolKeys[] = {"wrap", "autoPlay", "background", "tilt", "primary", "visible"};
     for (const char* key : boolKeys) {
         if (const JsonValue* member = findMember(value, key); member && member->is(JsonValue::Type::Bool)) {
             node.booleans[key] = member->boolean;
