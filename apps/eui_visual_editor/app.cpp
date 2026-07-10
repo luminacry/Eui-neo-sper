@@ -32,15 +32,12 @@ const std::string& documentPath() {
             "apps/eui_visual_designer/designed.ui.xml",
             "../apps/eui_visual_designer/designed.ui.xml",
             "../../apps/eui_visual_designer/designed.ui.xml",
-            "/home/user/EUI/apps/eui_visual_designer/designed.ui.xml",
             "apps/eui_visual_editor/examples/basic.ui.xml",
             "../apps/eui_visual_editor/examples/basic.ui.xml",
             "../../apps/eui_visual_editor/examples/basic.ui.xml",
-            "/home/user/EUI/apps/eui_visual_editor/examples/basic.ui.xml",
             "apps/eui_visual_editor/examples/basic.ui.json",
             "../apps/eui_visual_editor/examples/basic.ui.json",
             "../../apps/eui_visual_editor/examples/basic.ui.json",
-            "/home/user/EUI/apps/eui_visual_editor/examples/basic.ui.json",
         };
         for (const char* candidate : candidates) {
             std::error_code error;

@@ -115,12 +115,12 @@ private:
             node.strings[key] = value;
             return;
         }
-        if (key == "color" || key == "background" || key == "borderColor" || key == "textColor") {
-            node.colors[key] = parseColor(value);
+        if (key == "color" || key == "backgroundColor" || key == "borderColor" || key == "textColor") {
+            node.colors[key == "backgroundColor" ? "background" : key] = parseColor(value);
             return;
         }
-        if (key == "wrap" || key == "autoPlay" || key == "backgroundEnabled" ||
-            key == "background" || key == "tilt" || key == "primary") {
+        if (key == "wrap" || key == "autoPlay" || key == "background" ||
+            key == "backgroundEnabled" || key == "tilt" || key == "primary") {
             node.booleans[key == "backgroundEnabled" ? "background" : key] = parseBool(value);
             return;
         }

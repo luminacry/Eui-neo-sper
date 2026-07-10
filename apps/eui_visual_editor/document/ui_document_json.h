@@ -327,10 +327,11 @@ inline UiNode parseNode(const JsonValue& value, const std::string& fallbackId) {
         }
     }
 
-    const char* colorKeys[] = {"color", "background", "borderColor", "textColor"};
+    const char* colorKeys[] = {"color", "backgroundColor", "borderColor", "textColor"};
     for (const char* key : colorKeys) {
         if (const JsonValue* member = findMember(value, key)) {
-            node.colors[key] = parseColorArray(*member, {0.0f, 0.0f, 0.0f, 1.0f});
+            node.colors[key == std::string("backgroundColor") ? "background" : key] =
+                parseColorArray(*member, {0.0f, 0.0f, 0.0f, 1.0f});
         }
     }
 
